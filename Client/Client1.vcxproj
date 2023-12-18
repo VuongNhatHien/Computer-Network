@@ -145,12 +145,7 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\mmtTuan\client\image.cpp" />
-    <ClCompile Include="..\..\..\mmtTuan\client\Keyboard.cpp" />
-    <ClCompile Include="..\..\..\mmtTuan\client\main.cpp" />
-    <ClCompile Include="..\..\..\mmtTuan\client\Mouse.cpp" />
-    <ClCompile Include="..\..\..\mmtTuan\client\Socket.cpp" />
-    <ClCompile Include="..\..\..\mmtTuan\client\UI.cpp" />
+    <ClCompile Include="Image.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
@@ -158,9 +153,13 @@
     <ClCompile Include="imgui\imgui_impl_sdlrenderer2.cpp" />
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Keyboard.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Mouse.cpp" />
+    <ClCompile Include="Socket.cpp" />
+    <ClCompile Include="UI.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\mmtTuan\client\Image.h" />
     <ClInclude Include="..\..\..\mmtTuan\client\imgui\imconfig.h" />
     <ClInclude Include="..\..\..\mmtTuan\client\imgui\imgui.h" />
     <ClInclude Include="..\..\..\mmtTuan\client\imgui\imgui_impl_sdl2.h" />
@@ -169,11 +168,12 @@
     <ClInclude Include="..\..\..\mmtTuan\client\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\..\..\mmtTuan\client\imgui\imstb_textedit.h" />
     <ClInclude Include="..\..\..\mmtTuan\client\imgui\imstb_truetype.h" />
-    <ClInclude Include="..\..\..\mmtTuan\client\Keyboard.h" />
-    <ClInclude Include="..\..\..\mmtTuan\client\main.h" />
-    <ClInclude Include="..\..\..\mmtTuan\client\Mouse.h" />
-    <ClInclude Include="..\..\..\mmtTuan\client\Socket.h" />
-    <ClInclude Include="..\..\..\mmtTuan\client\UI.h" />
+    <ClInclude Include="Image.h" />
+    <ClInclude Include="Keyboard.h" />
+    <ClInclude Include="main.h" />
+    <ClInclude Include="Mouse.h" />
+    <ClInclude Include="Socket.h" />
+    <ClInclude Include="UI.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -31,26 +31,27 @@ SDL_Rect screenRect;
 
 SOCKET imageSocket, mouseSocket, keyboardSocket;
 
-State state = State::CONNECT_MENU;
+UIState uiState = UIState::DISPLAY_CONNECT_MENU;
 ConnectionState connectState = ConnectionState::NOT_YET;
+DiscoverState discoverState = DiscoverState::NOT_YET;
 
 int main(int argc, char** argv) {
     initUI();
 
-    while (state != State::QUIT) {
+    while (uiState != UIState::QUIT) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
-                state = State::QUIT;
+                uiState = UIState::QUIT;
             }
             ImGui_ImplSDL2_ProcessEvent(&event);
         }
 
-        switch (state) {
-        case State::CONNECT_MENU:
-            displayConnectPanel();
+        switch (uiState) {
+        case UIState::DISPLAY_CONNECT_MENU:
+            displayConnectMenu();
             break;
 
-        case State::INIT_CONTENT:
+        case UIState::START_THREADS:
             getServerScreenResolution();
 
             initClientSocket(mouseSocket, ip, mousePort);
@@ -67,11 +68,24 @@ int main(int argc, char** argv) {
                 imageThread.detach();
             }
 
-            state = State::DISPLAY_IMAGE;
+            uiState = UIState::DISPLAY_IMAGE;
             break;
 
-        case State::DISPLAY_IMAGE: break;
+        case UIState::DISPLAY_IMAGE: break;
 
+        case UIState::STOP:
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            WSACleanup();
+            closesocket(imageSocket);
+            closesocket(mouseSocket);
+            closesocket(keyboardSocket);
+            freeUI();
+            SDL_Quit();
+            std::cout << "Disconected.\n";
+            uiState = UIState::DISPLAY_CONNECT_MENU;
+            connectState = ConnectionState::NOT_YET;
+            discoverState = DiscoverState::NOT_YET;
+            initUI();
         default:
             break;
         }

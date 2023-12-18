@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include "UI.h"
 #include "imgui_impl_sdlrenderer2.h"
 #include "imgui_impl_sdl2.h"
@@ -9,9 +10,17 @@
 #include <chrono>
 #include <iostream>
 #include <WS2tcpip.h>
+#include <bitset>
 #pragma comment (lib, "ws2_32.lib")
 
-std::set < std::pair<std::string, std::string>> list;
+std::set < std::pair<std::string, std::string>> serversSet;
+
+char** ipList;
+char** hostnameList;
+char** ipAndHostnameList;
+int currentItem = 0;
+char sn[16] = "";
+char br[16] = "";
 
 void broadcastC(char *ip) {
 	WSADATA wsaData;
@@ -23,7 +32,7 @@ void broadcastC(char *ip) {
 
 	SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
 	struct timeval tv;
-	tv.tv_sec = 1;  // 1 second timeout
+	tv.tv_sec = 5;
 	tv.tv_usec = 0;
 	setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 
@@ -50,14 +59,15 @@ void broadcastC(char *ip) {
 		inet_ntop(AF_INET, &recvAddr.sin_addr, tmpIPbuf, 20);
 		std::string tmpIP(tmpIPbuf);
 		std::string tmpName(recvBuf);
-		//add server to list
+		//add server to serversSet
 		std::pair<std::string, std::string> tmp(tmpIP, tmpName);
-		list.insert(tmp);
+		serversSet.insert(tmp);
 	}
-
+	closesocket(sock);
 }
 
 void initUI() {
+	serversSet.clear();
 	SDL_Init(SDL_INIT_VIDEO);
 
 	const double scale = 1;
@@ -86,8 +96,66 @@ void freeUI() {
 	SDL_Quit();
 }
 
-void displayConnectPanel() {
+void createServersList() {
+	ipList = new char* [serversSet.size()];
+	hostnameList = new char* [serversSet.size()];
+	ipAndHostnameList = new char* [serversSet.size()];
+	int i = 0;
+	for (auto item : serversSet) {
+		ipList[i] = new char[item.first.length() + 1];
+		strcpy(ipList[i], item.first.c_str());
+		hostnameList[i] = new char[item.second.length() + 1];
+		strcpy(hostnameList[i], item.second.c_str());
+		ipAndHostnameList[i] = new char[item.first.length() + item.second.length() + 3];
+		strcpy(ipAndHostnameList[i], item.second.c_str());
+		strcat(ipAndHostnameList[i], " - ");
+		strcat(ipAndHostnameList[i], item.first.c_str());
+		i++;
+	}
+}
 
+void calculateBroadcast(char* IP, char* sn, char* broadcast) {
+	if (sn[0] == 0) {
+		strcpy(br, ip);
+		return;
+	}
+
+	char ip[16], subnetMask[16];
+	strcpy(ip, IP);
+	strcpy(subnetMask, sn);
+	std::bitset<32> ipBits(0), maskBits(0), broadcastBits(0);
+	int octet = 0;
+	char* token;
+
+	token = strtok(ip, ".");
+	for (int i = 0; i < 4; ++i) {
+		if (token != NULL) {
+			octet = atoi(token);
+			ipBits |= (octet << (24 - 8 * i));
+			token = strtok(NULL, ".");
+		}
+	}
+
+	token = strtok(subnetMask, ".");
+	for (int i = 0; i < 4; ++i) {
+		if (token != NULL) {
+			octet = atoi(token);
+			maskBits |= (octet << (24 - 8 * i));
+			token = strtok(NULL, ".");
+		}
+	}
+
+	broadcastBits = ipBits | ~maskBits;
+
+	sprintf(broadcast, "%lu.%lu.%lu.%lu",
+		(broadcastBits.to_ulong() >> 24) & 0xFF,
+		(broadcastBits.to_ulong() >> 16) & 0xFF,
+		(broadcastBits.to_ulong() >> 8) & 0xFF,
+		broadcastBits.to_ulong() & 0xFF);
+
+}
+
+void displayConnectMenu() {
 	ImGui_ImplSDLRenderer2_NewFrame();
 	ImGui_ImplSDL2_NewFrame(window);
 	ImGui::NewFrame();
@@ -96,39 +164,49 @@ void displayConnectPanel() {
 
     if (ImGui::Begin("Connect to server", NULL, ImGuiWindowFlags_NoResize)) {
 
-		ImGui::Text("Server's IP address:");
+		ImGui::Text("IP Address:");
 
 		ImGui::InputText("##IP", ip, IM_ARRAYSIZE(ip));
-
-        if (ImGui::Button("Connect")) {
-            if (initClientSocket(imageSocket, ip, imagePort)) {
-				connectState = ConnectionState::SUCCESS;
-			}
-            else {
-				connectState = ConnectionState::FAIL;
-			}
-		}
+		
+		ImGui::Text("Subnet Mask (Optional):");
+		ImGui::InputText("##SN", sn, IM_ARRAYSIZE(sn));
+		
 		if (ImGui::Button("Discover Servers")) {
-			broadcastC(ip);
+			calculateBroadcast(ip, sn, br);
+			broadcastC(br);
+			createServersList();
+			discoverState = DiscoverState::SUCCESS;
 			std::cout << "Active servers:\n";
-			for (auto p : list) {
+			for (auto p : serversSet) {
 				std::cout << p.first << " : " << p.second << "\n";
 			}
 		}
 
-		for (auto p : list) {
-			ImGui::Text(p.first.c_str());
-			ImGui::Text(p.second.c_str());
-		}
+		
+		if (discoverState == DiscoverState::SUCCESS) {
+			std::string discoveringInfo = "Discovered " + std::to_string(serversSet.size()) + " servers";
+			ImGui::Text(discoveringInfo.c_str());
+			ImGui::Combo("##MyDynamicCombo", &currentItem, ipAndHostnameList, static_cast<int>(serversSet.size()));
 
+			if (ImGui::Button("Connect")) {
+				strcpy(ip, ipList[currentItem]);
+				if (initClientSocket(imageSocket, ip, imagePort)) {
+					connectState = ConnectionState::SUCCESS;
+				}
+				else {
+					connectState = ConnectionState::FAIL;
+				}
+			}
+
+			if (connectState == ConnectionState::FAIL) {
+				ImGui::Text("Invalid IP address!");
+			}
+			else if (connectState == ConnectionState::SUCCESS) {
+				uiState = UIState::START_THREADS;
+			}
+		}
 		if (ImGui::Button("Exit")) {
-			state = State::QUIT;
-		}
-		if (connectState == ConnectionState::FAIL) {
-			ImGui::Text("Invalid IP address!");
-		}
-		else if (connectState == ConnectionState::SUCCESS) {
-			state = State::INIT_CONTENT;
+			uiState = UIState::QUIT;
 		}
 	}
 	ImGui::End();
@@ -146,8 +224,8 @@ void renderControlPanel() {
 
     ImGui::SetNextWindowSize(ImVec2(200, 100));
     if (ImGui::Begin("Control Panel", NULL, ImGuiWindowFlags_NoResize)) {
-        if (ImGui::Button("Exit")) {
-			state = State::QUIT;
+        if (ImGui::Button("Disconnect")) {
+			uiState = UIState::STOP;
         }
     }
     ImGui::End();
@@ -164,24 +242,25 @@ void renderImage(cv::Mat image) {
 
 	SDL_DestroyTexture(texture);
 	SDL_FreeSurface(surface);
-
-	std::this_thread::sleep_for(std::chrono::milliseconds(0));
 }
 
 void receiveAndDisplayImage() {
-    while (state != State::QUIT) {
-		auto start = std::chrono::high_resolution_clock::now();
-
-		cv::Mat image = receiveImage();
-
+	bool disconnectReq = false;
+    while (uiState == UIState::DISPLAY_IMAGE) {
+		cv::Mat image;
+		disconnectReq = !receiveImage(image);
+		if (disconnectReq) {
+			uiState = UIState::STOP;
+			std::cout << "shut down image thread.\n";
+			return;
+		}
         renderImage(image);
+		std::cout << "rendered image.\n";
 
 		renderControlPanel();
 
 		SDL_RenderPresent(renderer);
-
-		auto stop = std::chrono::high_resolution_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-		std::cout << "FPS: " << 1000.0 / duration.count() << "\n";
 	}
+	sendImageACK();
+	std::cout << "shut down image thread.\n";
 }
